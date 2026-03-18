@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRM WhatsApp</title>
+
+<style>
+body {
+  font-family: Arial;
+  background: #0f172a;
+  color: #fff;
+  padding: 20px;
+}
+
+.container {
+  max-width: 900px;
+  margin: auto;
+}
+
+h1, h2 {
+  color: #22c55e;
+}
+
+input, textarea, select {
+  padding: 10px;
+  margin: 5px;
+  border-radius: 6px;
+  border: none;
+}
+
+button {
+  padding: 10px;
+  margin: 5px;
+  border-radius: 6px;
+  border: none;
+  background: #22c55e;
+  color: black;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.card {
+  background: #1e293b;
+  padding: 12px;
+  margin-top: 10px;
+  border-radius: 10px;
+}
+
+.status {
+  margin-left: 10px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+}
+
+.frio { background: gray; }
+.interessado { background: orange; }
+.muito { background: green; }
+.nao { background: red; }
+
+.data {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 5px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>📋 CRM + Disparo WhatsApp</h1>
+
+<input id="nome" placeholder="Nome">
+<input id="numero" placeholder="Número (5599...)">
+<button onclick="addLead()">Adicionar</button>
+
+<br>
+
+<select id="filtro" onchange="render()">
+  <option value="todos">Todos</option>
+  <option value="Frio">Frio</option>
+  <option value="Interessado">Interessado</option>
+  <option value="Muito interessado">Muito interessado</option>
+  <option value="Não interessado">Não interessado</option>
+</select>
+
+<hr>
+
+<div id="lista"></div>
+
+<hr>
+
+<h2>💬 Disparo</h2>
+
+<textarea id="msg" placeholder="Mensagem... use {nome}" style="width:100%; height:100px;"></textarea>
+
+<br>
+
+<button onclick="enviar()">Enviar</button>
+<button onclick="selecionarTodos()">Selecionar todos</button>
+<button onclick="limparSelecionados()">Limpar seleção</button>
+
+</div>
+
+<script>
+
+let leads = JSON.parse(localStorage.getItem("leads") || "[]")
+
+function salvar() {
+  localStorage.setItem("leads", JSON.stringify(leads))
+}
+
+function addLead() {
+  const nome = document.getElementById("nome").value
+  const numero = document.getElementById("numero").value
+
+  if (!nome || !numero) return alert("Preencha tudo")
+
+  leads.push({
+    id: Date.now(),
+    nome,
+    numero,
+    status: "Frio",
+    selecionado: false,
+    ultimaMsg: null
+  })
+
+  salvar()
+  render()
+}
+
+function toggleStatus(id) {
+  const ordem = ["Frio", "Interessado", "Muito interessado", "Não interessado"]
+
+  leads = leads.map(l => {
+    if (l.id === id) {
+      const next = ordem[(ordem.indexOf(l.status) + 1) % ordem.length]
+      return { ...l, status: next }
+    }
+    return l
+  })
+
+  salvar()
+  render()
+}
+
+function toggleSelect(id) {
+  leads = leads.map(l => l.id === id ? { ...l, selecionado: !l.selecionado } : l)
+  salvar()
+  render()
+}
+
+function selecionarTodos() {
+  leads = leads.map(l => ({ ...l, selecionado: true }))
+  salvar()
+  render()
+}
+
+function limparSelecionados() {
+  leads = leads.map(l => ({ ...l, selecionado: false }))
+  salvar()
+  render()
+}
+
+function deletar(id) {
+  leads = leads.filter(l => l.id !== id)
+  salvar()
+  render()
+}
+
+function enviar() {
+  const msg = document.getElementById("msg").value
+  const selecionados = leads.filter(l => l.selecionado)
+
+  if (!msg) return alert("Digite a mensagem")
+  if (selecionados.length === 0) return alert("Selecione alguém")
+
+  const agora = new Date().toLocaleString()
+
+  leads = leads.map(l => {
+    if (l.selecionado) {
+      const texto = msg.replace("{nome}", l.nome)
+      const url = `https://wa.me/${l.numero}?text=${encodeURIComponent(texto)}`
+      window.open(url, "_blank")
+
+      return { ...l, ultimaMsg: agora }
+    }
+    return l
+  })
+
+  salvar()
+  render()
+}
+
+function render() {
+  const lista = document.getElementById("lista")
+  const filtro = document.getElementById("filtro").value
+
+  lista.innerHTML = ""
+
+  leads
+    .filter(l => filtro === "todos" || l.status === filtro)
+    .forEach(l => {
+
+      let classe = "frio"
+      if (l.status === "Interessado") classe = "interessado"
+      if (l.status === "Muito interessado") classe = "muito"
+      if (l.status === "Não interessado") classe = "nao"
+
+      lista.innerHTML += `
+        <div class="card">
+          <input type="checkbox" ${l.selecionado ? "checked" : ""} onclick="toggleSelect(${l.id})">
+          
+          <b>${l.nome}</b> - ${l.numero}
+          
+          <span class="status ${classe}" onclick="toggleStatus(${l.id})">
+            ${l.status}
+          </span>
+
+          <button onclick="deletar(${l.id})">❌</button>
+
+          <div class="data">
+            Última mensagem: ${l.ultimaMsg ? l.ultimaMsg : "Nunca enviada"}
+          </div>
+        </div>
+      `
+    })
+}
+
+render()
+
+</script>
+
+</body>
+</html>
